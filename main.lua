@@ -179,7 +179,7 @@ local function newMoveLearnMenu(mod, game, mon, newMoveId, onDone)
 
     local newDef = moveDef(self.game, self.newMoveId)
     local newName = newDef and newDef.name or tostring(self.newMoveId or "?????")
-    Font.draw(trunc(("NEW %s"):format(newName), NAME_MAX), 8, 15 * 8)
+    Font.draw(trunc(newName, NAME_MAX), 8, 15 * 8)
     drawPowerPp(Font, newDef, 16 * 8)
   end
 

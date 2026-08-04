@@ -1,7 +1,7 @@
 {
   "id": "move_learn_plus",
   "name": "Move Learn Plus",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "entry": "main.lua",
   "api": 2,
   "profile": "content",
