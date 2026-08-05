@@ -142,10 +142,62 @@ local function machineMoveFooter(game, itemId)
   if not machine or not machine.move then
     return nil
   end
+  -- TMs only (HMs keep the clerk greeting).
+  if machine.kind == "HM" then
+    return nil
+  end
+  if machine.kind ~= "TM"
+      and not (type(itemId) == "string" and itemId:find("^TM_")) then
+    return nil
+  end
   local mdef = moveDef(game, machine.move)
   local name = trunc((mdef and mdef.name) or tostring(machine.move), NAME_MAX)
   return ("%s\nPOWER %s ACC %s"):format(
     name, powerLabel(mdef), accuracyLabel(mdef))
+end
+
+local function wireTmIdleFooter(list, game, greet, showStatsFn)
+  local detailFooter = nil
+
+  local function refreshIdleFooter()
+    if not showStatsFn() then
+      if list.footer == detailFooter then
+        list.footer = greet
+      end
+      detailFooter = nil
+      return
+    end
+    local item = list.items[list.index]
+    local detail = item and machineMoveFooter(game, item.value) or nil
+    local idle = list.footer == greet or list.footer == detailFooter
+    if not idle then
+      return
+    end
+    if detail then
+      list.footer = detail
+      detailFooter = detail
+    else
+      list.footer = greet
+      detailFooter = nil
+    end
+  end
+
+  local baseUpdate = list.update
+  function list:update(dt)
+    baseUpdate(self, dt)
+    refreshIdleFooter()
+  end
+
+  return {
+    clearDetail = function()
+      detailFooter = nil
+    end,
+    restoreIdle = function()
+      list.footer = greet
+      detailFooter = nil
+      refreshIdleFooter()
+    end,
+  }
 end
 
 -- Mirror of src/ui/MoveLearnMenu.lua (engine 0.1.6x), with L2 detail panel.
@@ -340,30 +392,7 @@ local function newShopMenu(mod, game, stock, onQuit)
     local notEnough = txt(game, "_PokemartNotEnoughMoneyText",
       "You don't have\nenough money.")
     local list
-    local detailFooter = nil
-
-    local function refreshIdleFooter()
-      if not showStats() then
-        if list.footer == detailFooter then
-          list.footer = greet
-        end
-        detailFooter = nil
-        return
-      end
-      local item = list.items[list.index]
-      local detail = item and machineMoveFooter(game, item.value) or nil
-      local idle = list.footer == greet or list.footer == detailFooter
-      if not idle then
-        return
-      end
-      if detail then
-        list.footer = detail
-        detailFooter = detail
-      else
-        list.footer = greet
-        detailFooter = nil
-      end
-    end
+    local footer
 
     list = ListMenu.new(game, "BUY", items, {
       dialogue = true,
@@ -373,7 +402,7 @@ local function newShopMenu(mod, game, stock, onQuit)
         local def = game.data.items[item.value]
         if game.save.money < def.price then
           list.footer = notEnough
-          detailFooter = nil
+          footer.clearDetail()
           return
         end
         local affordable = math.min(99,
@@ -383,45 +412,39 @@ local function newShopMenu(mod, game, stock, onQuit)
           unitPrice = def.price,
           onDone = function(qty)
             if not qty then
-              list.footer = greet
-              detailFooter = nil
-              refreshIdleFooter()
+              footer.restoreIdle()
               return
             end
             local cost = qty * def.price
             list.footer = ("%s?\nThat will be\n¥%d. OK?"):format(def.name, cost)
-            detailFooter = nil
+            footer.clearDetail()
             game.stack:push(ChoiceBox.new(game, function(yes)
               if not yes then
-                list.footer = greet
-                detailFooter = nil
-                refreshIdleFooter()
+                footer.restoreIdle()
                 return
               end
               if game.save.money < cost then
                 list.footer = notEnough
+                footer.clearDetail()
                 return
               end
               if not bagAdd(game.save, item.value, qty, game) then
                 list.footer = txt(game, "_PokemartItemBagFullText",
                   "You can't carry\nany more items.")
+                footer.clearDetail()
                 return
               end
               game.save.money = game.save.money - cost
               list.footer = txt(game, "_PokemartBoughtItemText",
                 "Here you are!\nThank you!")
+              footer.clearDetail()
             end))
           end,
         }))
       end,
     })
 
-    local baseUpdate = list.update
-    function list:update(dt)
-      baseUpdate(self, dt)
-      refreshIdleFooter()
-    end
-
+    footer = wireTmIdleFooter(list, game, greet, showStats)
     game.stack:push(list)
   end
 
@@ -437,6 +460,7 @@ local function newShopMenu(mod, game, stock, onQuit)
     end
     local greet = txt(game, "_PokemartBuyingGreetingText", "Take your time.")
     local list
+    local footer
     list = ListMenu.new(game, "SELL", items, {
       dialogue = true,
       money = function() return game.save.money end,
@@ -446,6 +470,7 @@ local function newShopMenu(mod, game, stock, onQuit)
         if not def or def.keyItem or item.value:find("^HM_") then
           list.footer = txt(game, "_PokemartUnsellableItemText",
             "I can't put a\nprice on that.")
+          footer.clearDetail()
           return
         end
         local unit = math.floor(def.price / 2)
@@ -454,13 +479,14 @@ local function newShopMenu(mod, game, stock, onQuit)
           unitPrice = unit,
           onDone = function(qty)
             if not qty then
-              list.footer = greet
+              footer.restoreIdle()
               return
             end
             list.footer = ("I can pay you\n¥%d for that."):format(unit * qty)
+            footer.clearDetail()
             game.stack:push(ChoiceBox.new(game, function(yes)
               if not yes then
-                list.footer = greet
+                footer.restoreIdle()
                 return
               end
               game.save.money = game.save.money + unit * qty
@@ -472,11 +498,13 @@ local function newShopMenu(mod, game, stock, onQuit)
                 list:removeCurrent()
               end
               list.footer = txt(game, "_PokemartThankYouText", "Thank you!")
+              footer.clearDetail()
             end))
           end,
         }))
       end,
     })
+    footer = wireTmIdleFooter(list, game, greet, showStats)
     game.stack:push(list)
   end
 

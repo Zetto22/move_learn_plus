@@ -5,6 +5,19 @@ All notable changes to **Move Learn Plus** are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project versions with the `version` field in `manifest.json`.
 
+## [1.1.1] — 2026-08-05
+
+<!-- release-title: Mart SELL TM footer too -->
+
+### Added
+
+- Mart **SELL** list: cursor on a **TM** shows POWER / ACC in the footer
+  (same as BUY). HMs stay on the clerk greeting.
+
+### Changed
+
+- Mart footers are **TM-only** (BUY no longer details HMs).
+
 ## [1.1.0] — 2026-08-05
 
 <!-- release-title: Mart TM POWER and ACC footer -->

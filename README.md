@@ -9,8 +9,8 @@ API docs: [gen1recomp wiki](https://github.com/bryanthaboi/gen1recomp/wiki)
 When a Pokémon learns a new move and must forget an old one, the bottom panel shows **POWER**
 and **PP** (max) for the selected move and for the move being learned.
 
-In a Poké Mart **BUY** list, highlighting a TM/HM shows that move’s **POWER**
-and **ACC** in the clerk footer.
+In a Poké Mart **BUY** or **SELL** list, highlighting a **TM** shows that
+move’s **POWER** and **ACC** in the clerk footer (HMs unchanged).
 
 Works across Red / Blue / Yellow via the engine move registry. Disabling
 the mod restores the stock `MoveLearnMenu` and `ShopMenu`.
@@ -26,7 +26,7 @@ the mod restores the stock `MoveLearnMenu` and `ShopMenu`.
 
 - Forget-move screen (party full of moves while learning — level-up, TM,
   evolution, etc.)
-- Mart BUY list when the cursor is on a TM or HM
+- Mart BUY / SELL list when the cursor is on a **TM**
 
 ## Options
 
@@ -38,7 +38,7 @@ the mod restores the stock `MoveLearnMenu` and `ShopMenu`.
 
 - Status moves show `POWER --`.
 - Forget panel PP is the move's **max** PP from data (not current remaining).
-- Mart footer example: `BUBBLEBEAM` / `POWER 65 ACC 100`.
+- Mart footer (BUY/SELL) example: `THUNDERBOLT` / `POWER 95 ACC 100` (TMs only).
 - Accuracy and type on the forget panel are still out of scope.
 - Content mod (`affects_link: false`); overrides `MoveLearnMenu` and
   `ShopMenu`. If panels look vanilla, APPLY & RESTART and confirm the mod
