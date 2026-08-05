@@ -1,9 +1,9 @@
--- Move Learn Plus: forget-list shows POWER / PP for the selected move and
--- the move being learned. Reimplements MoveLearnMenu (no engine require)
--- so the screens override cannot silently fall back to vanilla.
+-- Move Learn Plus: forget-list POWER/PP panel, plus mart BUY footer
+-- showing POWER/ACC when the cursor is on a TM/HM.
 
 local CURSOR = 0xED
 local NAME_MAX = 18
+local BAG_CAPACITY = 20
 
 local HM_MOVES = {
   CUT = true, FLY = true, SURF = true, STRENGTH = true, FLASH = true,
@@ -34,11 +34,118 @@ local function ppLabel(def)
   return tostring(def.pp)
 end
 
+local function accuracyLabel(def)
+  if not def or def.accuracy == nil then
+    return "--"
+  end
+  return tostring(def.accuracy)
+end
+
 local function drawPowerPp(Font, def, y)
   local power = ("POWER %s"):format(powerLabel(def))
   local pp = ("PP %s"):format(ppLabel(def))
   Font.draw(power, 8, y)
   Font.draw(pp, 160 - 8 - #pp * 8, y)
+end
+
+local function txt(game, key, fallback)
+  local table_ = game and game.data and game.data.text
+  return (table_ and table_[key]) or fallback
+end
+
+local function isBadge(id)
+  return type(id) == "string" and id:find("BADGE", 1, true) ~= nil
+end
+
+local function bagCapacity(game)
+  local configured = game and game.data and game.data.constants
+      and game.data.constants.bagSize
+  if type(configured) == "number" and configured >= 1 then
+    return math.floor(configured)
+  end
+  return BAG_CAPACITY
+end
+
+local function bagSlots(save)
+  local n = 0
+  for id in pairs(save.inventory or {}) do
+    if not isBadge(id) then n = n + 1 end
+  end
+  return n
+end
+
+local function bagOrder(save)
+  local order = save.bagOrder
+  if not order then
+    order = {}
+    for id in pairs(save.inventory or {}) do
+      if not isBadge(id) then order[#order + 1] = id end
+    end
+    table.sort(order)
+    save.bagOrder = order
+  end
+  local seen = {}
+  for i = #order, 1, -1 do
+    local id = order[i]
+    if not save.inventory[id] or seen[id] then
+      table.remove(order, i)
+    else
+      seen[id] = true
+    end
+  end
+  for id in pairs(save.inventory or {}) do
+    if not isBadge(id) and not seen[id] then
+      order[#order + 1] = id
+    end
+  end
+  return order
+end
+
+local function bagAdd(save, id, qty, game)
+  local inv = save.inventory
+  qty = qty or 1
+  if not inv[id] and not isBadge(id) and bagSlots(save) >= bagCapacity(game) then
+    return false
+  end
+  if not isBadge(id) and (inv[id] or 0) + qty > 99 then
+    return false
+  end
+  local isNew = not inv[id]
+  inv[id] = (inv[id] or 0) + qty
+  if isNew and not isBadge(id) then
+    table.insert(bagOrder(save), id)
+  end
+  return true
+end
+
+local function bagRemove(save, id, qty)
+  local inv = save.inventory
+  inv[id] = (inv[id] or 0) - (qty or 1)
+  if inv[id] <= 0 then
+    inv[id] = nil
+    local order = save.bagOrder
+    if order then
+      for i, oid in ipairs(order) do
+        if oid == id then
+          table.remove(order, i)
+          break
+        end
+      end
+    end
+  end
+end
+
+local function machineMoveFooter(game, itemId)
+  local items = game and game.data and game.data.items
+  local idef = items and items[itemId]
+  local machine = idef and idef.machine
+  if not machine or not machine.move then
+    return nil
+  end
+  local mdef = moveDef(game, machine.move)
+  local name = trunc((mdef and mdef.name) or tostring(machine.move), NAME_MAX)
+  return ("%s\nPOWER %s ACC %s"):format(
+    name, powerLabel(mdef), accuracyLabel(mdef))
 end
 
 -- Mirror of src/ui/MoveLearnMenu.lua (engine 0.1.6x), with L2 detail panel.
@@ -64,8 +171,6 @@ local function newMoveLearnMenu(mod, game, mon, newMoveId, onDone)
   end
 
   local function stringsCancel()
-    -- Keep the English CANCEL label; localization of engine Strings is
-    -- not on the stable mod surface without internals.
     return "CANCEL"
   end
 
@@ -207,6 +312,183 @@ local function newMoveLearnMenu(mod, game, mon, newMoveId, onDone)
   return self
 end
 
+-- Mirror of src/ui/ShopMenu.lua with TM/HM POWER/ACC in the BUY footer.
+local function newShopMenu(mod, game, stock, onQuit)
+  local ListMenu = mod.ui.ListMenu
+  local Menu = mod.ui.Menu
+  local ChoiceBox = mod.ui.ChoiceBox
+  local QuantityBox = mod.ui.QuantityBox
+
+  local function showStats()
+    return mod.options:get("show_stats") ~= false
+  end
+
+  local function buy()
+    local items = {}
+    for _, id in ipairs(stock or {}) do
+      local def = game.data.items[id]
+      if def then
+        items[#items + 1] = {
+          value = id,
+          label = def.name,
+          right = ("¥%d"):format(def.price),
+        }
+      end
+    end
+
+    local greet = txt(game, "_PokemartBuyingGreetingText", "Take your time.")
+    local notEnough = txt(game, "_PokemartNotEnoughMoneyText",
+      "You don't have\nenough money.")
+    local list
+    local detailFooter = nil
+
+    local function refreshIdleFooter()
+      if not showStats() then
+        if list.footer == detailFooter then
+          list.footer = greet
+        end
+        detailFooter = nil
+        return
+      end
+      local item = list.items[list.index]
+      local detail = item and machineMoveFooter(game, item.value) or nil
+      local idle = list.footer == greet or list.footer == detailFooter
+      if not idle then
+        return
+      end
+      if detail then
+        list.footer = detail
+        detailFooter = detail
+      else
+        list.footer = greet
+        detailFooter = nil
+      end
+    end
+
+    list = ListMenu.new(game, "BUY", items, {
+      dialogue = true,
+      money = function() return game.save.money end,
+      footer = greet,
+      onChoose = function(item)
+        local def = game.data.items[item.value]
+        if game.save.money < def.price then
+          list.footer = notEnough
+          detailFooter = nil
+          return
+        end
+        local affordable = math.min(99,
+          math.floor(game.save.money / math.max(1, def.price)))
+        game.stack:push(QuantityBox.new(game, {
+          max = affordable,
+          unitPrice = def.price,
+          onDone = function(qty)
+            if not qty then
+              list.footer = greet
+              detailFooter = nil
+              refreshIdleFooter()
+              return
+            end
+            local cost = qty * def.price
+            list.footer = ("%s?\nThat will be\n¥%d. OK?"):format(def.name, cost)
+            detailFooter = nil
+            game.stack:push(ChoiceBox.new(game, function(yes)
+              if not yes then
+                list.footer = greet
+                detailFooter = nil
+                refreshIdleFooter()
+                return
+              end
+              if game.save.money < cost then
+                list.footer = notEnough
+                return
+              end
+              if not bagAdd(game.save, item.value, qty, game) then
+                list.footer = txt(game, "_PokemartItemBagFullText",
+                  "You can't carry\nany more items.")
+                return
+              end
+              game.save.money = game.save.money - cost
+              list.footer = txt(game, "_PokemartBoughtItemText",
+                "Here you are!\nThank you!")
+            end))
+          end,
+        }))
+      end,
+    })
+
+    local baseUpdate = list.update
+    function list:update(dt)
+      baseUpdate(self, dt)
+      refreshIdleFooter()
+    end
+
+    game.stack:push(list)
+  end
+
+  local function sell()
+    local items = {}
+    for _, id in ipairs(bagOrder(game.save)) do
+      local def = game.data.items[id]
+      items[#items + 1] = {
+        value = id,
+        label = def and def.name or id,
+        right = "x" .. game.save.inventory[id],
+      }
+    end
+    local greet = txt(game, "_PokemartBuyingGreetingText", "Take your time.")
+    local list
+    list = ListMenu.new(game, "SELL", items, {
+      dialogue = true,
+      money = function() return game.save.money end,
+      footer = greet,
+      onChoose = function(item)
+        local def = game.data.items[item.value]
+        if not def or def.keyItem or item.value:find("^HM_") then
+          list.footer = txt(game, "_PokemartUnsellableItemText",
+            "I can't put a\nprice on that.")
+          return
+        end
+        local unit = math.floor(def.price / 2)
+        game.stack:push(QuantityBox.new(game, {
+          max = game.save.inventory[item.value] or 1,
+          unitPrice = unit,
+          onDone = function(qty)
+            if not qty then
+              list.footer = greet
+              return
+            end
+            list.footer = ("I can pay you\n¥%d for that."):format(unit * qty)
+            game.stack:push(ChoiceBox.new(game, function(yes)
+              if not yes then
+                list.footer = greet
+                return
+              end
+              game.save.money = game.save.money + unit * qty
+              bagRemove(game.save, item.value, qty)
+              local left = game.save.inventory[item.value]
+              if left then
+                item.right = "x" .. left
+              else
+                list:removeCurrent()
+              end
+              list.footer = txt(game, "_PokemartThankYouText", "Thank you!")
+            end))
+          end,
+        }))
+      end,
+    })
+    game.stack:push(list)
+  end
+
+  local menu = Menu.new(game, {
+    { label = "BUY", keepOpen = true, onSelect = buy },
+    { label = "SELL", keepOpen = true, onSelect = sell },
+    { label = "QUIT", onSelect = onQuit },
+  }, { tx = 0, ty = 0, tw = 8, th = 8 })
+  menu.onCancel = onQuit
+  return menu
+end
+
 return function(mod)
   mod.log:info("carregado")
 
@@ -214,19 +496,30 @@ return function(mod)
     { key = "show_stats", type = "toggle", label = "SHOW STATS", default = true },
   })
 
-  -- Builtin is not pre-registered in Data.screens; override installs ours.
   mod.content.screens:override("MoveLearnMenu", {
     new = function(game, mon, newMoveId, onDone)
       return newMoveLearnMenu(mod, game, mon, newMoveId, onDone)
     end,
   })
 
+  mod.content.screens:override("ShopMenu", {
+    new = function(game, stock, onQuit)
+      return newShopMenu(mod, game, stock, onQuit)
+    end,
+  })
+
   mod.events:on("game.ready", function()
-    local rec = mod.content.screens:get("MoveLearnMenu")
-    if type(rec) == "table" and type(rec.new) == "function" then
+    local learn = mod.content.screens:get("MoveLearnMenu")
+    local shop = mod.content.screens:get("ShopMenu")
+    if type(learn) == "table" and type(learn.new) == "function" then
       mod.log:info("MoveLearnMenu override active")
     else
       mod.log:error("MoveLearnMenu override missing after load")
+    end
+    if type(shop) == "table" and type(shop.new) == "function" then
+      mod.log:info("ShopMenu override active")
+    else
+      mod.log:error("ShopMenu override missing after load")
     end
   end)
 end

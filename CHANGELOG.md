@@ -5,6 +5,16 @@ All notable changes to **Move Learn Plus** are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project versions with the `version` field in `manifest.json`.
 
+## [1.1.0] — 2026-08-05
+
+<!-- release-title: Mart TM POWER and ACC footer -->
+
+### Added
+
+- Mart **BUY** list: with the cursor on a TM/HM, the clerk footer shows the
+  contained move's **POWER** and **ACC** (status moves: `POWER --`).
+- Same **SHOW STATS** toggle gates the mart footer and the forget panel.
+
 ## [1.0.1] — 2026-08-04
 
 <!-- release-title: Drop NEW prefix on learned move -->

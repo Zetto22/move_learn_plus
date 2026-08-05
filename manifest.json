@@ -1,14 +1,14 @@
 {
   "id": "move_learn_plus",
   "name": "Move Learn Plus",
-  "version": "1.0.1",
+  "version": "1.1.0",
   "entry": "main.lua",
   "api": 2,
   "profile": "content",
   "affects_link": false,
   "category": "UI",
   "priority": 100,
-  "description": "Shows power and PP when choosing which move to forget while learning a new one.",
+  "description": "Move POWER/PP on the forget screen; TM/HM POWER/ACC in the mart BUY footer.",
   "game_version": ">=0.0.0-0 <2.0.0",
   "github": "Zetto22/move_learn_plus"
 }

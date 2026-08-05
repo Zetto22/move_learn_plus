@@ -9,8 +9,11 @@ API docs: [gen1recomp wiki](https://github.com/bryanthaboi/gen1recomp/wiki)
 When a Pokémon learns a new move and must forget an old one, the bottom panel shows **POWER**
 and **PP** (max) for the selected move and for the move being learned.
 
+In a Poké Mart **BUY** list, highlighting a TM/HM shows that move’s **POWER**
+and **ACC** in the clerk footer.
+
 Works across Red / Blue / Yellow via the engine move registry. Disabling
-the mod restores the stock `MoveLearnMenu`.
+the mod restores the stock `MoveLearnMenu` and `ShopMenu`.
 
 ## Install
 
@@ -21,25 +24,26 @@ the mod restores the stock `MoveLearnMenu`.
 
 ## When it appears
 
-Automatically, whenever the game opens the forget-move screen (party full
-of moves while learning a new one — level-up, TM, evolution, etc.).
+- Forget-move screen (party full of moves while learning — level-up, TM,
+  evolution, etc.)
+- Mart BUY list when the cursor is on a TM or HM
 
 ## Options
 
 | Option | Default | Meaning |
 |--------|---------|---------|
-| SHOW STATS | on | Enriched bottom panel; off = vanilla “Which move…” text |
+| SHOW STATS | on | Enriched forget panel + mart TM footer; off = vanilla text |
 
 ## Notes
 
 - Status moves show `POWER --`.
-- PP is the move's **max** PP from data (not current remaining).
-- Accuracy and type are out of scope for this version.
-- Content mod (`affects_link: false`); there is no hook for forget-list
-  labels, so the mod **overrides** the `MoveLearnMenu` screen. If the
-  panel still looks vanilla, use APPLY & RESTART and confirm the mod is
-  enabled (not merely staged).
-- GitHub releases for in-game Update must use tag **`vX.Y.Z`** (e.g. `v1.0.0`)
+- Forget panel PP is the move's **max** PP from data (not current remaining).
+- Mart footer example: `BUBBLEBEAM` / `POWER 65 ACC 100`.
+- Accuracy and type on the forget panel are still out of scope.
+- Content mod (`affects_link: false`); overrides `MoveLearnMenu` and
+  `ShopMenu`. If panels look vanilla, APPLY & RESTART and confirm the mod
+  is enabled (not merely staged).
+- GitHub releases for in-game Update must use tag **`vX.Y.Z`** (e.g. `v1.1.0`)
   with asset **`move_learn_plus-X.Y.Z.zip`**. Prefixed tags are ignored by
   the launcher.
 - License: [MIT](LICENSE) · Changes: [CHANGELOG.md](CHANGELOG.md)
